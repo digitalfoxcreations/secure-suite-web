@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101c35"><title>Secure Suite V3 — Web Workspace</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="loginView" class="login-shell">
+    <form id="loginForm" class="login-card">
+      <div class="brand-mark">SS</div><p class="eyebrow">MANAGEMENT WORKSPACE</p>
+      <h1>Secure Suite <span>V3</span></h1><p class="muted">Sign in to your workspace</p>
+      <label>Email address<input id="email" type="email" autocomplete="username" required></label>
+      <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+      <button class="primary full" type="submit">Sign in</button><p id="loginMessage" class="message"></p>
+      <small>Configure your Supabase project in <code>app.js</code> before signing in.</small>
+    </form>
+  </div>
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">SS</div><div><b>SECURE SUITE</b><small>V3 WEB WORKSPACE</small></div></div>
+      <div class="nav-label">WORKSPACE</div>
+      <button class="nav active" data-page="dashboard">▦ <span>Dashboard</span></button>
+      <button class="nav" data-page="profiles">♙ <span>TA Profiles</span></button>
+      <button class="nav" data-page="tracker">☷ <span>Work Tracker</span></button>
+      <button class="nav" data-page="accounts">₹ <span>Accounts & Payments</span></button>
+      <button class="nav" data-page="estimate">▤ <span>Estimate Generator</span></button>
+      <div class="sidebar-bottom"><div id="userEmail" class="user-email"></div><button id="logoutBtn" class="nav logout">↪ <span>Sign out</span></button></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><p class="eyebrow">SECURE OPERATIONS</p><h2 id="pageTitle">Dashboard</h2></div><div class="top-actions"><span class="online-dot"></span><span>Connected workspace</span></div></header>
+      <div id="notice" class="notice hidden"></div>
+      <section id="pageContent"></section>
+      <footer>Secure Suite V3 <span>•</span> Supabase connected database</footer>
+    </main>
+  </div>
+  <dialog id="recordDialog"><form id="recordForm" method="dialog"><div class="dialog-head"><h3 id="dialogTitle">New record</h3><button type="button" class="icon-btn" id="closeDialog">✕</button></div><div id="dialogFields" class="form-grid"></div><div class="dialog-actions"><button type="button" class="secondary" id="cancelDialog">Cancel</button><button class="primary" type="submit">Save record</button></div></form></dialog>
+  <script src="app.js"></script>
+</body></html>
