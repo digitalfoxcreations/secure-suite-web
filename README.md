@@ -10,7 +10,7 @@ This is a static-web conversion starter for the supplied PHP/MySQL Secure Suite 
 - Work tracker: create entries, status, TA/block filtering and search
 - Estimate number generation (`Est-00001` format)
 - Accounts: payment ledger and oldest-outstanding-first allocation
-- MNREGA report-body and forwarding-note generator
+- VB G-RAM-G report-body and forwarding-note generator
 - Responsive layout for desktop, tablet and mobile
 - Supabase SQL schema with Row Level Security and a private estimates bucket
 
