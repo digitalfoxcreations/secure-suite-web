@@ -4,8 +4,8 @@
    3) Paste your Project URL and anon/public key below.
    Never put a service_role key in this file.
 */
-const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY';
+const SUPABASE_URL = 'https://thbjucmyhdvmwvaxgnle.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_pwh0AcAxLWEUelK1jKMRmw_s19Ntzpw';
 const dbReady = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
 const sb = dbReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const $ = s => document.querySelector(s);
