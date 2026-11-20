@@ -155,9 +155,9 @@ begin
     if jsonb_typeof(v_json) = 'array' then
       return exists (
         select 1
-        from jsonb_array_elements(v_json) as items(value)
-        where lower(coalesce(value ->> 'name', value ->> 'gp_name',
-          case when jsonb_typeof(value) = 'string' then regexp_replace(trim(both '"' from value::text), '^[A-Z]{2}[0-9]{4,}\s*[-–—|]\s*', '', 'i') end, '')) = lower(trim(p_gp_name))
+        from jsonb_array_elements(v_json) as items(gp_item)
+        where lower(coalesce(gp_item ->> 'name', gp_item ->> 'gp_name',
+          case when jsonb_typeof(gp_item) = 'string' then regexp_replace(trim(both '"' from gp_item::text), '^[A-Z]{2}[0-9]{4,}\s*[-–—|]\s*', '', 'i') end, '')) = lower(trim(p_gp_name))
       );
     elsif jsonb_typeof(v_json) = 'object' then
       return lower(coalesce(v_json ->> 'name', v_json ->> 'gp_name', '')) = lower(trim(p_gp_name));
@@ -183,14 +183,26 @@ security definer
 set search_path = public
 as $
 begin
-  if nullif(trim(new.work_name), '') is null then
-    raise exception 'Work description is required.';
-  end if;
-  if new.bill_amount <= 0 then
-    raise exception 'Work bill amount must be greater than zero.';
-  end if;
-  if new.received_date is not null and new.received_date > current_date then
-    raise exception 'Work received date cannot be in the future.';
+  if tg_op = 'INSERT' then
+    if nullif(trim(new.work_name), '') is null then
+      raise exception 'Work description is required.';
+    end if;
+    if new.bill_amount <= 0 then
+      raise exception 'Work bill amount must be greater than zero.';
+    end if;
+    if new.received_date is not null and new.received_date > current_date then
+      raise exception 'Work received date cannot be in the future.';
+    end if;
+  else
+    if new.work_name is distinct from old.work_name and nullif(trim(new.work_name), '') is null then
+      raise exception 'Work description is required.';
+    end if;
+    if new.bill_amount is distinct from old.bill_amount and new.bill_amount <= 0 then
+      raise exception 'Work bill amount must be greater than zero.';
+    end if;
+    if new.received_date is distinct from old.received_date and new.received_date > current_date then
+      raise exception 'Work received date cannot be in the future.';
+    end if;
   end if;
 
   if tg_op = 'INSERT'
