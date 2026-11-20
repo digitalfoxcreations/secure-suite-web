@@ -316,3 +316,21 @@ grant execute on function public.record_ta_payment(text,numeric,date,text,text,t
 
 -- Historical payment ledger entries are intentionally not auto-allocated:
 -- the legacy data does not contain a reliable payment-to-work mapping.
+
+-- Tighten execution privileges for privileged/internal functions.
+-- Trigger functions are callable only by PostgreSQL's trigger machinery, not through PostgREST RPC.
+revoke all on function public.audit_row_change() from public, anon, authenticated;
+revoke all on function public.guard_work_payment_amount() from public, anon, authenticated;
+revoke all on function public.ta_has_gp_mapping(text,text) from public, anon, authenticated;
+revoke all on function public.validate_work_assignment() from public, anon, authenticated;
+
+-- Workspace membership helper is needed by authenticated RLS policies only.
+revoke all on function public.is_workspace_user() from public, anon;
+grant execute on function public.is_workspace_user() to authenticated;
+
+-- Payment RPC is the sole authenticated entry point for writing payments.
+revoke all on function public.record_ta_payment(text,numeric,date,text,text,text) from public, anon;
+grant execute on function public.record_ta_payment(text,numeric,date,text,text,text) to authenticated;
+
+-- Existing event-trigger helper is not an application RPC.
+revoke all on function public.rls_auto_enable() from public, anon, authenticated;
