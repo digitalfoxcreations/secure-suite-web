@@ -109,7 +109,8 @@ function renderReports(){
 function renderAudit(){
  shell('Audit History',`<div class="panel"><div class="panel-head"><h3>Recent system activity</h3><span class="pill neutral">Latest 100 events</span></div><p class="hint">Changes to profiles, work records, payments and payment allocations are recorded automatically. Historical events begin from the date the audit migration is installed.</p>${state.audit.length?`<div class="table-wrap"><table><thead><tr><th>Date & time</th><th>Action</th><th>Module</th><th>Record ID</th><th>User</th><th>Change details</th></tr></thead><tbody>${state.audit.map(a=>{const details=a.action==='UPDATE'?'Before / after values captured':a.action==='DELETE'?'Record removed':'New record created';return `<tr><td>${new Date(a.created_at).toLocaleString('en-IN')}</td><td><span class="pill ${a.action==='DELETE'?'':'neutral'}">${esc(a.action)}</span></td><td>${esc(a.table_name)}</td><td>${esc(a.record_id||'—')}</td><td>${esc(a.actor_email||'System')}</td><td>${details}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">No audit events found. Apply supabase-improvements.sql to enable audit history.</div>'}</div>`);
 }
-\nfunction isoDateLocal(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
+
+function isoDateLocal(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function financialYearStart(today=new Date()){const year=today.getFullYear();return `${today.getMonth()>=3?year:year-1}-04-01`}
 function renderEstimate(){
  const gpNames=[...new Set(state.profiles.flatMap(p=>parseVillages(p.villages).map(v=>v.name)).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
