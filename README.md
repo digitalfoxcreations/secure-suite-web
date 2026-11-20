@@ -59,3 +59,12 @@ The original PHP project includes server-side features that require further migr
 ## Current status
 
 This is a working foundation, not a claim that every PHP feature has already been reproduced. It is intentionally structured so the remaining migration tasks can be added without exposing database credentials.
+
+
+### Gram Panchayat mapping display correction
+The Profile Directory parses legacy mapping lines such as `UP145367 - AALAPUR` into separate Gram Panchayat Code and Gram Panchayat Name columns. Existing Supabase records do not need to be re-imported.
+
+
+## Bill Generation
+
+The Bill Generation page provides a current-financial-year statement (1 April of the current financial year through today) and a custom date-range statement. Users can optionally filter by Gram Panchayat name. The printed statement includes work register entries and payment ledger entries for the selected period. Internal Gram Panchayat IDs are not displayed. The statement is a period report; verify allocations and figures before official submission.
