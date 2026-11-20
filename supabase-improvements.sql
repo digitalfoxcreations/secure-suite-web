@@ -350,32 +350,41 @@ create index if not exists payments_ledger_ta_name_idx on public.payments_ledger
 update public.work_tracker set status='Completed' where status is distinct from 'Completed';
 
 drop policy if exists "workspace access" on public.clients;
+drop policy if exists "admin operator manage clients" on public.clients;
 create policy "admin operator manage clients" on public.clients for all to authenticated
 using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')))
 with check (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+drop policy if exists "ta read own profile" on public.clients;
 create policy "ta read own profile" on public.clients for select to authenticated
 using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role='ta' and ur.client_id=clients.id));
 
 drop policy if exists "workspace access" on public.work_tracker;
+drop policy if exists "admin operator manage work" on public.work_tracker;
 create policy "admin operator manage work" on public.work_tracker for all to authenticated
 using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')))
 with check (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+drop policy if exists "ta read assigned work" on public.work_tracker;
 create policy "ta read assigned work" on public.work_tracker for select to authenticated
 using (exists(select 1 from public.user_roles ur join public.clients c on c.id=ur.client_id where ur.user_id=(select auth.uid()) and ur.role='ta' and lower(c.name)=lower(work_tracker.ta_name)));
 
 drop policy if exists "workspace access" on public.payments_ledger;
+drop policy if exists "admin operator read payments" on public.payments_ledger;
 create policy "admin operator read payments" on public.payments_ledger for select to authenticated
 using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+drop policy if exists "ta read own payments" on public.payments_ledger;
 create policy "ta read own payments" on public.payments_ledger for select to authenticated
 using (exists(select 1 from public.user_roles ur join public.clients c on c.id=ur.client_id where ur.user_id=(select auth.uid()) and ur.role='ta' and lower(c.name)=lower(payments_ledger.ta_name)));
 
 drop policy if exists "workspace read allocations" on public.payment_allocations;
+drop policy if exists "admin operator read allocations" on public.payment_allocations;
 create policy "admin operator read allocations" on public.payment_allocations for select to authenticated
 using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+drop policy if exists "ta read own allocations" on public.payment_allocations;
 create policy "ta read own allocations" on public.payment_allocations for select to authenticated
 using (exists(select 1 from public.user_roles ur join public.clients c on c.id=ur.client_id join public.work_tracker w on w.ta_name=c.name where ur.user_id=(select auth.uid()) and ur.role='ta' and w.id=payment_allocations.work_id));
 
 drop policy if exists "workspace read audit logs" on public.audit_logs;
+drop policy if exists "admin operator read audit logs" on public.audit_logs;
 create policy "admin operator read audit logs" on public.audit_logs for select to authenticated
 using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
 
