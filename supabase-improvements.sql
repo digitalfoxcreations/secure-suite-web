@@ -138,7 +138,7 @@ language plpgsql
 stable
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_raw text;
   v_json jsonb;
@@ -172,7 +172,7 @@ begin
     where lower(trim(regexp_replace(line, '^[A-Z]{2}[0-9]{4,}\s*[-–—|]\s*', '', 'i'))) = lower(trim(p_gp_name))
   );
 end;
-$;
+$$;
 
 revoke all on function public.ta_has_gp_mapping(text,text) from public;
 
@@ -181,7 +181,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   if tg_op = 'INSERT' then
     if nullif(trim(new.work_name), '') is null then
@@ -215,7 +215,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists validate_work_assignment on public.work_tracker;
 create trigger validate_work_assignment before insert or update on public.work_tracker
