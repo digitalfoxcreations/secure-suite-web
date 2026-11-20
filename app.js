@@ -4,8 +4,8 @@
    3) Paste your Project URL and anon/public key below.
    Never put a service_role key in this file.
 */
-const SUPABASE_URL = 'https://thbjucmyhdvmwvaxgnle.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_pwh0AcAxLWEUelK1jKMRmw_s19Ntzpw';
+const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_PUBLIC_KEY';
 const dbReady = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
 const sb = dbReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const $ = s => document.querySelector(s);
@@ -40,8 +40,27 @@ function renderDashboard(){
 }
 function jobsTable(rows){if(!rows.length)return '<div class="empty">No work records found.</div>';return `<div class="table-wrap"><table><thead><tr><th>Estimate</th><th>Work description</th><th>TA / Block</th><th>Gram Panchayat</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.estimate_number||'—')}</td><td><b>${esc(x.work_name)}</b></td><td>${esc(x.ta_name)}<br><small>${esc(x.block_name)}</small></td><td>${esc(x.gp_name)}</td><td>${esc(x.received_date||'—')}</td><td>${money(x.bill_amount)}</td><td><span class="pill ${x.status==='Completed'?'done':''}">${esc(x.status)}</span></td></tr>`).join('')}</tbody></table></div>`}
 function parseVillages(value){
- try{const parsed=typeof value==='string'?JSON.parse(value||'[]'):value;if(Array.isArray(parsed))return parsed.map(v=>typeof v==='string'?{code:'',name:v}:{code:v.code||'',name:v.name||''});}catch(_e){}
- return String(value||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{const parts=line.split(/\s*\|\s*/);return {code:parts.length>1?parts[0]:'',name:parts.length>1?parts.slice(1).join(' | '):parts[0]};});
+ const normalize=(item)=>{
+  if(item && typeof item==='object')return {code:String(item.code||item.gp_code||''),name:String(item.name||item.gp_name||'')};
+  const line=String(item||'').trim();
+  if(!line)return null;
+  // Legacy database stores mappings as "UP145367 - AALAPUR".
+  const match=line.match(/^([A-Z]{2}\d{4,})\s*(?:[-–—|])\s*(.+)$/i);
+  if(match)return {code:match[1].toUpperCase(),name:match[2].trim()};
+  const parts=line.split(/\s*\|\s*/);
+  if(parts.length>1)return {code:parts.shift().trim(),name:parts.join(' | ').trim()};
+  return {code:'',name:line};
+ };
+ if(Array.isArray(value))return value.map(normalize).filter(Boolean);
+ if(value && typeof value==='object')return [normalize(value)].filter(Boolean);
+ const raw=String(value||'').trim();
+ if(!raw)return [];
+ try{
+  const parsed=JSON.parse(raw);
+  if(Array.isArray(parsed))return parsed.map(normalize).filter(Boolean);
+  if(parsed && typeof parsed==='object')return [normalize(parsed)].filter(Boolean);
+ }catch(_e){}
+ return raw.split(/\r?\n/).map(normalize).filter(Boolean);
 }
 function renderProfiles(){
  if(!state.profiles.some(p=>p.id===state.selectedProfileId))state.selectedProfileId=state.profiles[0]?.id??null;
