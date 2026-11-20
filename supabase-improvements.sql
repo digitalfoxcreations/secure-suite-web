@@ -155,9 +155,9 @@ begin
     if jsonb_typeof(v_json) = 'array' then
       return exists (
         select 1
-        from jsonb_array_elements(v_json) e
-        where lower(coalesce(e ->> 'name', e ->> 'gp_name',
-          case when jsonb_typeof(e) = 'string' then trim(both '"' from e::text) end, '')) = lower(trim(p_gp_name))
+        from jsonb_array_elements(v_json) as items(value)
+        where lower(coalesce(value ->> 'name', value ->> 'gp_name',
+          case when jsonb_typeof(value) = 'string' then regexp_replace(trim(both '"' from value::text), '^[A-Z]{2}[0-9]{4,}\\s*[-–—|]\\s*', '', 'i') end, '')) = lower(trim(p_gp_name))
       );
     elsif jsonb_typeof(v_json) = 'object' then
       return lower(coalesce(v_json ->> 'name', v_json ->> 'gp_name', '')) = lower(trim(p_gp_name));
