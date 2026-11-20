@@ -334,3 +334,74 @@ grant execute on function public.record_ta_payment(text,numeric,date,text,text,t
 
 -- Existing event-trigger helper is not an application RPC.
 revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+
+
+-- TA read-only accounts, row-level isolation, and secure admin/TA chat.
+-- Run once after the original business-logic migration.
+-- Create TA auth users in Supabase Authentication, then use the portal's
+-- Profile Directory -> Connect a TA login form to map Auth User ID to a TA profile.
+
+alter table public.user_roles drop constraint if exists user_roles_role_check;
+alter table public.user_roles add constraint user_roles_role_check check (role in ('admin','operator','ta'));
+alter table public.user_roles add column if not exists client_id bigint references public.clients(id) on delete restrict;
+create index if not exists user_roles_client_id_idx on public.user_roles(client_id);
+create index if not exists work_tracker_ta_name_idx on public.work_tracker(ta_name);
+create index if not exists payments_ledger_ta_name_idx on public.payments_ledger(ta_name);
+update public.work_tracker set status='Completed' where status is distinct from 'Completed';
+
+drop policy if exists "workspace access" on public.clients;
+create policy "admin operator manage clients" on public.clients for all to authenticated
+using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')))
+with check (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+create policy "ta read own profile" on public.clients for select to authenticated
+using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role='ta' and ur.client_id=clients.id));
+
+drop policy if exists "workspace access" on public.work_tracker;
+create policy "admin operator manage work" on public.work_tracker for all to authenticated
+using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')))
+with check (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+create policy "ta read assigned work" on public.work_tracker for select to authenticated
+using (exists(select 1 from public.user_roles ur join public.clients c on c.id=ur.client_id where ur.user_id=(select auth.uid()) and ur.role='ta' and lower(c.name)=lower(work_tracker.ta_name)));
+
+drop policy if exists "workspace access" on public.payments_ledger;
+create policy "admin operator read payments" on public.payments_ledger for select to authenticated
+using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+create policy "ta read own payments" on public.payments_ledger for select to authenticated
+using (exists(select 1 from public.user_roles ur join public.clients c on c.id=ur.client_id where ur.user_id=(select auth.uid()) and ur.role='ta' and lower(c.name)=lower(payments_ledger.ta_name)));
+
+drop policy if exists "workspace read allocations" on public.payment_allocations;
+create policy "admin operator read allocations" on public.payment_allocations for select to authenticated
+using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+create policy "ta read own allocations" on public.payment_allocations for select to authenticated
+using (exists(select 1 from public.user_roles ur join public.clients c on c.id=ur.client_id join public.work_tracker w on w.ta_name=c.name where ur.user_id=(select auth.uid()) and ur.role='ta' and w.id=payment_allocations.work_id));
+
+drop policy if exists "workspace read audit logs" on public.audit_logs;
+create policy "admin operator read audit logs" on public.audit_logs for select to authenticated
+using (exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')));
+
+create or replace function public.assign_ta_login(p_user_id uuid,p_client_id bigint) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+ if auth.uid() is null or not exists(select 1 from public.user_roles ur where ur.user_id=auth.uid() and ur.role in ('admin','operator')) then raise exception 'Only an administrator can assign TA logins.'; end if;
+ if p_user_id is null or p_client_id is null or not exists(select 1 from public.clients where id=p_client_id) then raise exception 'Select a valid Auth user and Technical Assistant profile.'; end if;
+ if p_user_id=auth.uid() then raise exception 'You cannot replace your own administrator login with a TA login.'; end if;
+ insert into public.user_roles(user_id,role,client_id) values(p_user_id,'ta',p_client_id) on conflict(user_id) do update set role='ta',client_id=excluded.client_id;
+end $$;
+revoke all on function public.assign_ta_login(uuid,bigint) from public,anon;
+grant execute on function public.assign_ta_login(uuid,bigint) to authenticated;
+
+create table if not exists public.ta_admin_messages(id bigint generated by default as identity primary key,ta_client_id bigint not null references public.clients(id) on delete restrict,sender_id uuid not null references auth.users(id) on delete restrict,sender_role text not null check(sender_role in ('admin','ta')),body text not null check(length(trim(body)) between 1 and 4000),created_at timestamptz not null default now());
+create index if not exists ta_admin_messages_thread_idx on public.ta_admin_messages(ta_client_id,created_at,id);
+alter table public.ta_admin_messages enable row level security;
+drop policy if exists "chat participants read messages" on public.ta_admin_messages;
+create policy "chat participants read messages" on public.ta_admin_messages for select to authenticated using (
+ exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator')) or
+ exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role='ta' and ur.client_id=ta_admin_messages.ta_client_id));
+drop policy if exists "chat participants send messages" on public.ta_admin_messages;
+create policy "chat participants send messages" on public.ta_admin_messages for insert to authenticated with check(sender_id=(select auth.uid()) and (
+ (sender_role='admin' and exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role in ('admin','operator'))) or
+ (sender_role='ta' and exists(select 1 from public.user_roles ur where ur.user_id=(select auth.uid()) and ur.role='ta' and ur.client_id=ta_admin_messages.ta_client_id))));
+revoke all on public.ta_admin_messages from anon;
+grant select,insert on public.ta_admin_messages to authenticated;
+grant usage,select on sequence public.ta_admin_messages_id_seq to authenticated;
+do $$ begin if exists(select 1 from pg_publication where pubname='supabase_realtime') and not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='ta_admin_messages') then alter publication supabase_realtime add table public.ta_admin_messages; end if; end $$;
