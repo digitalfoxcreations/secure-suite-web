@@ -130,6 +130,83 @@ drop trigger if exists guard_work_payment_amount on public.work_tracker;
 create trigger guard_work_payment_amount before insert or update on public.work_tracker
 for each row execute function public.guard_work_payment_amount();
 
+-- Validate new work assignments against the selected TA's assigned Gram Panchayat list.
+-- Existing legacy work rows are not rewritten; unrelated edits to legacy rows remain possible.
+create or replace function public.ta_has_gp_mapping(p_ta_name text, p_gp_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $
+declare
+  v_raw text;
+  v_json jsonb;
+begin
+  select villages into v_raw
+  from public.clients
+  where lower(name) = lower(trim(p_ta_name))
+  limit 1;
+
+  if v_raw is null or nullif(trim(p_gp_name), '') is null then return false; end if;
+
+  begin
+    v_json := v_raw::jsonb;
+    if jsonb_typeof(v_json) = 'array' then
+      return exists (
+        select 1
+        from jsonb_array_elements(v_json) e
+        where lower(coalesce(e ->> 'name', e ->> 'gp_name',
+          case when jsonb_typeof(e) = 'string' then trim(both '"' from e::text) end, '')) = lower(trim(p_gp_name))
+      );
+    elsif jsonb_typeof(v_json) = 'object' then
+      return lower(coalesce(v_json ->> 'name', v_json ->> 'gp_name', '')) = lower(trim(p_gp_name));
+    end if;
+  exception when others then
+    v_json := null;
+  end;
+
+  return exists (
+    select 1
+    from regexp_split_to_table(v_raw, E'\\r?\\n') as raw_line
+    where lower(trim(regexp_replace(raw_line, '^[A-Z]{2}[0-9]{4,}\\s*[-–—|]\\s*', '', 'i'))) = lower(trim(p_gp_name))
+  );
+end;
+$;
+
+create or replace function public.validate_work_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if nullif(trim(new.work_name), '') is null then
+    raise exception 'Work description is required.';
+  end if;
+  if new.bill_amount <= 0 then
+    raise exception 'Work bill amount must be greater than zero.';
+  end if;
+  if new.received_date is not null and new.received_date > current_date then
+    raise exception 'Work received date cannot be in the future.';
+  end if;
+
+  if tg_op = 'INSERT'
+     or new.ta_name is distinct from old.ta_name
+     or new.gp_name is distinct from old.gp_name then
+    if nullif(trim(new.ta_name), '') is null
+       or not public.ta_has_gp_mapping(new.ta_name, new.gp_name) then
+      raise exception 'The selected Gram Panchayat is not assigned to this Technical Assistant.';
+    end if;
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists validate_work_assignment on public.work_tracker;
+create trigger validate_work_assignment before insert or update on public.work_tracker
+for each row execute function public.validate_work_assignment();
+
 -- A payment and all its allocations are committed together or not at all.
 -- Outstanding works are allocated oldest-first. Work completion status is kept separate
 -- from payment status and is never changed automatically by a payment.
