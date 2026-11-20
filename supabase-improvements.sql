@@ -165,6 +165,16 @@ begin
   end if;
   if nullif(trim(p_payment_mode), '') is null then raise exception 'Select a payment mode.'; end if;
   if nullif(trim(p_depositing_operator), '') is null then raise exception 'Enter the depositing operator.'; end if;
+  if nullif(trim(p_reference_no), '') is not null then
+    perform pg_advisory_xact_lock(hashtextextended(lower(trim(p_ta_name) || '|' || trim(p_reference_no)), 0));
+    if exists (
+      select 1 from public.payments_ledger
+      where lower(ta_name) = lower(trim(p_ta_name))
+        and lower(coalesce(reference_no, '')) = lower(trim(p_reference_no))
+    ) then
+      raise exception 'This payment reference is already recorded for this Technical Assistant.';
+    end if;
+  end if;
 
   -- Lock all outstanding works for this TA in deterministic order to avoid concurrent over-allocation.
   perform set_config('app.payment_rpc', 'on', true);
