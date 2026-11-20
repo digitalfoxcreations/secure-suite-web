@@ -42,6 +42,8 @@ for select to authenticated using (public.is_workspace_user());
 revoke insert, update, delete on public.payment_allocations from authenticated;
 revoke insert, update, delete on public.audit_logs from authenticated;
 grant select on public.payment_allocations, public.audit_logs to authenticated;
+revoke insert, update, delete on public.payments_ledger from authenticated;
+grant select on public.payments_ledger to authenticated;
 
 create or replace function public.audit_row_change()
 returns trigger
@@ -105,13 +107,20 @@ language plpgsql
 set search_path = public
 as $$
 begin
-  if tg_op = 'UPDATE'
-     and new.paid_amount is distinct from old.paid_amount
-     and current_setting('app.payment_rpc', true) is distinct from 'on' then
-    raise exception 'Paid amount can only be changed through the payment allocation workflow.';
-  end if;
-  if new.bill_amount < 0 or new.paid_amount < 0 or new.paid_amount > new.bill_amount then
-    raise exception 'Work bill and paid amounts are invalid.';
+  if tg_op = 'UPDATE' then
+    if new.paid_amount is distinct from old.paid_amount
+       and current_setting('app.payment_rpc', true) is distinct from 'on' then
+      raise exception 'Paid amount can only be changed through the payment allocation workflow.';
+    end if;
+    if new.bill_amount < 0 or new.paid_amount < 0
+       or ((new.bill_amount is distinct from old.bill_amount or new.paid_amount is distinct from old.paid_amount)
+           and new.paid_amount > new.bill_amount) then
+      raise exception 'Work bill and paid amounts are invalid.';
+    end if;
+  else
+    if new.bill_amount < 0 or new.paid_amount < 0 or new.paid_amount > new.bill_amount then
+      raise exception 'Work bill and paid amounts are invalid.';
+    end if;
   end if;
   return new;
 end;
