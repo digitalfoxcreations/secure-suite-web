@@ -53,3 +53,5 @@ body{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 .submission-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:800px){.submission-layout{grid-template-columns:1fr}.submission-card{grid-template-columns:1fr}.submission-photo img{max-height:300px}.submission-review{grid-template-columns:1fr}.submission-actions{grid-column:auto}}
 @media(max-width:560px){.submission-queue{grid-template-columns:1fr}.submission-form-panel{padding:14px}}
+
+.upload-pdf-label{display:inline-flex;align-items:center;cursor:pointer;white-space:nowrap}.work-pdf-actions{white-space:nowrap}.work-pdf-actions .small-btn{margin:2px}
