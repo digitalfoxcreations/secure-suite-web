@@ -168,11 +168,13 @@ begin
 
   return exists (
     select 1
-    from regexp_split_to_table(v_raw, E'\\r?\\n') as raw_line
-    where lower(trim(regexp_replace(raw_line, '^[A-Z]{2}[0-9]{4,}\\s*[-–—|]\\s*', '', 'i'))) = lower(trim(p_gp_name))
+    from regexp_split_to_table(v_raw, E'\\r?\\n') as lines(line)
+    where lower(trim(regexp_replace(line, '^[A-Z]{2}[0-9]{4,}\\s*[-–—|]\\s*', '', 'i'))) = lower(trim(p_gp_name))
   );
 end;
 $;
+
+revoke all on function public.ta_has_gp_mapping(text,text) from public;
 
 create or replace function public.validate_work_assignment()
 returns trigger
