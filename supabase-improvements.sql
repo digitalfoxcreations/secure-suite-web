@@ -438,3 +438,105 @@ grant execute on function public.assign_ta_login(uuid,bigint) to authenticated;
 
 -- No public policy or browser code needs this legacy helper after TA row isolation.
 revoke all on function public.is_workspace_user() from public,anon,authenticated;
+
+
+-- Keep the PostgREST RPC as SECURITY INVOKER; privileged allocation logic lives in the unexposed private schema.
+create or replace function private.record_ta_payment_internal(
+  p_ta_name text,
+  p_amount numeric,
+  p_payment_date date,
+  p_payment_mode text,
+  p_reference_no text,
+  p_depositing_operator text
+)
+returns table(payment_id bigint, allocated_amount numeric, remaining_amount numeric)
+language plpgsql
+security definer
+set search_path = public
+as $vbprivate$
+declare
+  v_work record;
+  v_available numeric(14,2) := 0;
+  v_remaining numeric(14,2);
+  v_alloc numeric(14,2);
+  v_payment_id bigint;
+begin
+  if auth.uid() is null or not exists (select 1 from public.user_roles ur where ur.user_id=auth.uid() and ur.role in ('admin','operator')) then
+    raise exception 'Only administration can record payments.';
+  end if;
+  if nullif(trim(p_ta_name), '') is null then raise exception 'Select a Technical Assistant.'; end if;
+  if p_amount is null or p_amount <= 0 or round(p_amount, 2) <> p_amount then
+    raise exception 'Enter a valid payment amount with up to two decimal places.';
+  end if;
+  if p_payment_date is null or p_payment_date > current_date then
+    raise exception 'Payment date cannot be in the future.';
+  end if;
+  if nullif(trim(p_payment_mode), '') is null then raise exception 'Select a payment mode.'; end if;
+  if nullif(trim(p_depositing_operator), '') is null then raise exception 'Enter the depositing operator.'; end if;
+  if nullif(trim(p_reference_no), '') is not null then
+    perform pg_advisory_xact_lock(hashtextextended(lower(trim(p_ta_name) || '|' || trim(p_reference_no)), 0));
+    if exists (
+      select 1 from public.payments_ledger
+      where lower(ta_name) = lower(trim(p_ta_name))
+        and lower(coalesce(reference_no, '')) = lower(trim(p_reference_no))
+    ) then
+      raise exception 'This payment reference is already recorded for this Technical Assistant.';
+    end if;
+  end if;
+
+  -- Lock all outstanding works for this TA in deterministic order to avoid concurrent over-allocation.
+  perform set_config('app.payment_rpc', 'on', true);
+  for v_work in
+    select id, bill_amount, paid_amount
+    from public.work_tracker
+    where ta_name = trim(p_ta_name) and bill_amount > paid_amount
+    order by received_date nulls first, id
+    for update
+  loop
+    v_available := v_available + greatest(0, v_work.bill_amount - v_work.paid_amount);
+  end loop;
+
+  if p_amount > v_available then
+    raise exception 'Payment exceeds the current outstanding balance of %.', v_available;
+  end if;
+
+  insert into public.payments_ledger(ta_name, amount, payment_date, payment_mode, reference_no, depositing_operator)
+  values (trim(p_ta_name), p_amount, p_payment_date, trim(p_payment_mode), nullif(trim(p_reference_no), ''), trim(p_depositing_operator))
+  returning id into v_payment_id;
+
+  v_remaining := p_amount;
+  for v_work in
+    select id, bill_amount, paid_amount
+    from public.work_tracker
+    where ta_name = trim(p_ta_name) and bill_amount > paid_amount
+    order by received_date nulls first, id
+    for update
+  loop
+    exit when v_remaining <= 0;
+    v_alloc := least(v_remaining, greatest(0, v_work.bill_amount - v_work.paid_amount));
+    if v_alloc > 0 then
+      update public.work_tracker
+      set paid_amount = paid_amount + v_alloc
+      where id = v_work.id;
+      insert into public.payment_allocations(payment_id, work_id, amount)
+      values (v_payment_id, v_work.id, v_alloc);
+      v_remaining := v_remaining - v_alloc;
+    end if;
+  end loop;
+
+  return query select v_payment_id, p_amount - v_remaining, v_remaining;
+end;
+$vbprivate$;
+
+
+create or replace function public.record_ta_payment(
+ p_ta_name text,p_amount numeric,p_payment_date date,p_payment_mode text,p_reference_no text,p_depositing_operator text
+) returns table(payment_id bigint,allocated_amount numeric,remaining_amount numeric)
+language sql security invoker set search_path=''
+as $vbwrapper$
+ select * from private.record_ta_payment_internal(p_ta_name,p_amount,p_payment_date,p_payment_mode,p_reference_no,p_depositing_operator);
+$vbwrapper$;
+revoke all on function private.record_ta_payment_internal(text,numeric,date,text,text,text) from public,anon;
+grant execute on function private.record_ta_payment_internal(text,numeric,date,text,text,text) to authenticated;
+revoke all on function public.record_ta_payment(text,numeric,date,text,text,text) from public,anon;
+grant execute on function public.record_ta_payment(text,numeric,date,text,text,text) to authenticated;
