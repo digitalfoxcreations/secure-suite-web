@@ -244,8 +244,8 @@ declare
   v_alloc numeric(14,2);
   v_payment_id bigint;
 begin
-  if auth.uid() is null or not public.is_workspace_user() then
-    raise exception 'You are not authorized to record payments.';
+  if auth.uid() is null or not exists (select 1 from public.user_roles ur where ur.user_id=auth.uid() and ur.role in ('admin','operator')) then
+    raise exception 'Only administration can record payments.';
   end if;
   if nullif(trim(p_ta_name), '') is null then raise exception 'Select a Technical Assistant.'; end if;
   if p_amount is null or p_amount <= 0 or round(p_amount, 2) <> p_amount then
@@ -405,3 +405,22 @@ revoke all on public.ta_admin_messages from anon;
 grant select,insert on public.ta_admin_messages to authenticated;
 grant usage,select on sequence public.ta_admin_messages_id_seq to authenticated;
 do $$ begin if exists(select 1 from pg_publication where pubname='supabase_realtime') and not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='ta_admin_messages') then alter publication supabase_realtime add table public.ta_admin_messages; end if; end $$;
+
+
+-- Secure role assignment without exposing a SECURITY DEFINER function in public.
+create schema if not exists private;
+revoke all on schema private from public,anon;
+grant usage on schema private to authenticated;
+create or replace function private.is_workspace_admin() returns boolean language sql stable security definer set search_path='' as $$ select exists(select 1 from public.user_roles ur where ur.user_id=auth.uid() and ur.role in ('admin','operator')) $$;
+revoke all on function private.is_workspace_admin() from public,anon;
+grant execute on function private.is_workspace_admin() to authenticated;
+drop policy if exists "admin read all user roles" on public.user_roles;
+create policy "admin read all user roles" on public.user_roles for select to authenticated using (private.is_workspace_admin());
+drop policy if exists "admin insert user roles" on public.user_roles;
+create policy "admin insert user roles" on public.user_roles for insert to authenticated with check (private.is_workspace_admin());
+drop policy if exists "admin update user roles" on public.user_roles;
+create policy "admin update user roles" on public.user_roles for update to authenticated using (private.is_workspace_admin()) with check (private.is_workspace_admin());
+grant select,insert,update on public.user_roles to authenticated;
+create or replace function public.assign_ta_login(p_user_id uuid,p_client_id bigint) returns void language plpgsql security invoker set search_path='' as $$ begin if auth.uid() is null or not private.is_workspace_admin() then raise exception 'Only an administrator can assign TA logins.'; end if; if p_user_id is null or p_client_id is null or not exists(select 1 from public.clients where id=p_client_id) then raise exception 'Select a valid Auth user and Technical Assistant profile.'; end if; if p_user_id=auth.uid() then raise exception 'You cannot replace your own administrator login with a TA login.'; end if; insert into public.user_roles(user_id,role,client_id) values(p_user_id,'ta',p_client_id) on conflict(user_id) do update set role='ta',client_id=excluded.client_id; end $$;
+revoke all on function public.assign_ta_login(uuid,bigint) from public,anon;
+grant execute on function public.assign_ta_login(uuid,bigint) to authenticated;
