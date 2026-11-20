@@ -166,7 +166,7 @@ async function downloadWorkPdf(workId){
  const {data,error}=await sb.storage.from('estimates').download(work.pdf_storage_path);
  if(error){notify('PDF download failed: '+error.message,true);return}
  const url=URL.createObjectURL(data),a=document.createElement('a');
- a.href=url;a.download=work.pdf_filename||((work.estimate_number||'work-estimate')+'.pdf');
+ a.href=url;a.download=(work.estimate_number||'work-estimate')+'.pdf';
  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
 }
 document.addEventListener('click',e=>{
