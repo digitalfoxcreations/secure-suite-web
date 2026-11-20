@@ -181,8 +181,10 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $vbgramg$
 begin
+  -- This register only accepts work after it has been completed.
+  new.status := 'Completed';
   if tg_op = 'INSERT' then
     if nullif(trim(new.work_name), '') is null then
       raise exception 'Work description is required.';
@@ -215,7 +217,7 @@ begin
   end if;
   return new;
 end;
-$$;
+$vbgramg$;
 
 drop trigger if exists validate_work_assignment on public.work_tracker;
 create trigger validate_work_assignment before insert or update on public.work_tracker
