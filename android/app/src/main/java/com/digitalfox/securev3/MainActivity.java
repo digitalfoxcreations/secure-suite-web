@@ -91,7 +91,7 @@ public class MainActivity extends Activity {
     }
 
     private class DownloadBridge {
-        @JavascriptInterface public String getAppVersion() { return BuildConfig.VERSION_NAME; }
+        @JavascriptInterface public String getAppVersion() { try { return MainActivity.this.getPackageManager().getPackageInfo(MainActivity.this.getPackageName(), 0).versionName; } catch (Exception e) { return "unknown"; } }
         @JavascriptInterface public void saveBase64(String data, String mime, String name) {
             try {
                 byte[] bytes = Base64.decode(data, Base64.DEFAULT);
