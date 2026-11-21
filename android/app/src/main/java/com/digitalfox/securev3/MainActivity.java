@@ -28,16 +28,19 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(android.graphics.Color.BLACK);
         web = new WebView(this);
         web.setBackgroundColor(android.graphics.Color.WHITE);
+        web.setSaveEnabled(true);
         setContentView(web);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
+        s.setDomStorageEnabled(true); // Retains the Supabase login session on this device.
+        s.setSaveFormData(true);
         s.setDatabaseEnabled(true);
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(true);
         s.setJavaScriptCanOpenWindowsAutomatically(false);
         s.setSupportMultipleWindows(false);
         web.addJavascriptInterface(new DownloadBridge(), "SecureV3Native");
+        CookieManager.getInstance().setAcceptCookie(true);
         web.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (uploadCallback != null) uploadCallback.onReceiveValue(null);
