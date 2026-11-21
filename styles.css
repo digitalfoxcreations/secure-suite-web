@@ -55,3 +55,20 @@ body{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 @media(max-width:560px){.submission-queue{grid-template-columns:1fr}.submission-form-panel{padding:14px}}
 
 .upload-pdf-label{display:inline-flex;align-items:center;cursor:pointer;white-space:nowrap}.work-pdf-actions{white-space:nowrap}.work-pdf-actions .small-btn{margin:2px}
+
+/* Mobile app identity and always-visible account controls */
+.mobile-brandbar{display:none}
+.brand-mark svg{display:block;width:29px;height:29px}
+@media(max-width:800px){
+ .mobile-brandbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:linear-gradient(110deg,#102a43,#173f5f);color:#fff;box-shadow:0 3px 14px #102a4320;position:relative;z-index:11}
+ .mobile-brand{display:flex;align-items:center;gap:9px;min-width:0}
+ .mobile-brand .brand-mark{width:38px;height:38px;flex:none;border-radius:11px;background:linear-gradient(135deg,#20a4a0,#167d9a);color:#fff;display:grid;place-items:center}
+ .mobile-brand .brand-mark svg{width:26px;height:26px}
+ .mobile-brand b{display:block;font:800 13px Manrope;letter-spacing:.35px;color:#fff}
+ .mobile-brand small{display:block;font-size:8px;letter-spacing:1px;color:#a9c1d1;margin-top:2px}
+ .mobile-account{display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0}
+ .mobile-account span{max-width:32vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c5d7e3;font-size:9px}
+ .mobile-account button{flex:none;border:1px solid #ffffff45;border-radius:8px;background:#ffffff12;color:#fff;padding:8px 9px;font-size:10px;font-weight:800}
+ .mobile-account button:active{background:#ffffff2b}
+}
+@media(max-width:380px){.mobile-account span{display:none}.mobile-brand small{font-size:7px}}
