@@ -7,7 +7,7 @@
 const SUPABASE_URL = 'https://thbjucmyhdvmwvaxgnle.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_pwh0AcAxLWEUelK1jKMRmw_s19Ntzpw';
 const dbReady = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
-const sb = dbReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const sb = dbReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage } }) : null;
 const $ = s => document.querySelector(s);
 const state = {user:null,role:null,clientId:null,page:'dashboard',profiles:[],jobs:[],payments:[],allocations:[],audit:[],submissions:[],migrationReady:false,editing:null,selectedProfileId:null,chatClientId:null,chatChannel:null};
 const blocks=['FATEHPUR MANDAON','BADRAON','RATANPURA','DOHRIGHAT','GHOSI','KOPAGANJ','PARDHAHA','RANIPUR','MUHAMMADABAD GOHNA'];
@@ -19,9 +19,16 @@ async function init(){
  const {data:{session}}=await sb.auth.getSession();if(session) await enter(session.user);
  sb.auth.onAuthStateChange(async(_e,session)=>{if(session&&!state.user)await enter(session.user);else if(!session){if(state.chatChannel){sb.removeChannel(state.chatChannel);state.chatChannel=null}state.user=null;state.role=null;state.clientId=null;$('#appView').classList.add('hidden');$('#loginView').classList.remove('hidden')}});
 }
-async function enter(user){const {data:assignment,error}=await sb.from('user_roles').select('role,client_id').eq('user_id',user.id).maybeSingle();if(error||!assignment){$('#loginMessage').textContent='This login is not assigned to a VB G-RAM-G account. Contact the administrator.';await sb.auth.signOut();return}state.user=user;state.role=assignment.role;state.clientId=assignment.client_id||null;if(state.role==='ta'&&!state.clientId){$('#loginMessage').textContent='This TA login has no linked profile. Contact the administrator.';await sb.auth.signOut();return}$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#userEmail').textContent=user.email||'';$('#mobileUserEmail').textContent=user.email||'Signed in';document.querySelectorAll('[data-admin-only]').forEach(el=>el.classList.toggle('hidden',state.role==='ta'));await loadAll();state.page='dashboard';render()}
+async function enter(user){const {data:assignment,error}=await sb.from('user_roles').select('role,client_id').eq('user_id',user.id).maybeSingle();if(error||!assignment){$('#loginMessage').textContent='This login is not assigned to a VB G-RAM-G account. Contact the administrator.';await sb.auth.signOut();return}state.user=user;state.role=assignment.role;state.clientId=assignment.client_id||null;if(state.role==='ta'&&!state.clientId){$('#loginMessage').textContent='This TA login has no linked profile. Contact the administrator.';await sb.auth.signOut();return}$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden');$('#userEmail').textContent=user.email||'';$('#mobileUserEmail').textContent=user.email||'Signed in';document.querySelectorAll('[data-admin-only]').forEach(el=>el.classList.toggle('hidden',state.role==='ta'));await loadAll();state.page='dashboard';render();showFirstLoginGuide(user.id)}
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();if(!sb)return;$('#loginMessage').textContent='Signing in…';const {error}=await sb.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});$('#loginMessage').textContent=error?error.message:'';});
 $('#logoutBtn').onclick=()=>sb.auth.signOut();$('#mobileLogoutBtn').onclick=()=>sb.auth.signOut();
+$('#quickGuideBtn').onclick=showQuickGuide;$('#quickGuideClose').onclick=closeQuickGuide;$('#quickGuideDone').onclick=closeQuickGuide;
+
+function guideStorageKey(userId){return 'securev3_quick_guide_seen_'+userId}
+function showQuickGuide(){const dialog=$('#quickGuideDialog');if(dialog&&!dialog.open)dialog.showModal()}
+function showFirstLoginGuide(userId){try{if(!localStorage.getItem(guideStorageKey(userId)))showQuickGuide()}catch(e){showQuickGuide()}}
+function closeQuickGuide(){try{if(state.user?.id)localStorage.setItem(guideStorageKey(state.user.id),'1')}catch(e){}const dialog=$('#quickGuideDialog');if(dialog?.open)dialog.close()}
+
 document.querySelectorAll('.nav[data-page]').forEach(b=>b.onclick=()=>{if(state.chatChannel&&b.dataset.page!=='chat'){sb.removeChannel(state.chatChannel);state.chatChannel=null}state.page=b.dataset.page;document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x===b));render()});
 async function loadAll(){
  const [p,j,a,al,au,ws]=await Promise.all([sb.from('clients').select('*').order('name'),sb.from('work_tracker').select('*').order('id',{ascending:false}),sb.from('payments_ledger').select('*').order('id',{ascending:false}),sb.from('payment_allocations').select('*').order('id',{ascending:false}),sb.from('audit_logs').select('*').order('id',{ascending:false}).limit(100),sb.from('ta_work_submissions').select('*').order('created_at',{ascending:false})]);
