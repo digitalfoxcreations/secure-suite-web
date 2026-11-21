@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -48,6 +48,13 @@ jobs:
           keytool -list -keystore "$RUNNER_TEMP/securev3-upload.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/securev3-upload.jks" >> "$GITHUB_ENV"
         working-directory: android
+      - name: Read Android app version
+        id: app_version
+        shell: bash
+        run: |
+          VERSION=$(sed -n "s/.*versionName '\\([^']*\\)'.*/\\1/p" android/app/build.gradle)
+          test -n "$VERSION"
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Build signed release APK
         run: gradle --no-daemon assembleRelease
         working-directory: android
@@ -62,3 +69,12 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 90
+
+      - name: Publish APK as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.app_version.outputs.name }}
+          name: Secure V3 Android v${{ steps.app_version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          files: android/app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true
