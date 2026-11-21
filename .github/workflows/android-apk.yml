@@ -52,7 +52,7 @@ jobs:
         id: app_version
         shell: bash
         run: |
-          VERSION=$(sed -n "s/.*versionName '\\([^']*\\)'.*/\\1/p" android/app/build.gradle)
+          VERSION=$(grep -o "versionName '[^']*'" android/app/build.gradle | cut -d"'" -f2)
           test -n "$VERSION"
           echo "name=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Build signed release APK
