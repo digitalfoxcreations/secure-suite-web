@@ -1,0 +1,14 @@
+Secure V3 Android signing key
+
+Keep this file and the .jks file private. Do not commit either file to GitHub.
+
+GitHub Actions repository secrets to create:
+ANDROID_KEYSTORE_BASE64 = contents of ANDROID_KEYSTORE_BASE64.txt
+ANDROID_KEYSTORE_PASSWORD = ozZYIQMl429GSgW32bxnV2FJXuznwUk6
+ANDROID_KEY_ALIAS = securev3
+ANDROID_KEY_PASSWORD = xkZHW8aLObQde4O4gR3jC1YDBxu75qi6
+
+Keystore file: securev3-upload.jks
+Alias: securev3
+
+IMPORTANT: Back up the .jks file and these passwords in a secure password manager. Losing them prevents future signed updates.
