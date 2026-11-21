@@ -39,8 +39,41 @@ async function loadAll(){
  if(!state.migrationReady)console.warn('Payment allocation or audit migration is not available.');
 }
 function shell(title,html){$('#pageTitle').textContent=title;$('#pageContent').innerHTML=html}
-function render(){if(state.role==='ta'&&!['dashboard','chat'].includes(state.page))state.page='dashboard';({dashboard:renderDashboard,profiles:renderProfiles,tracker:renderTracker,accounts:renderAccounts,estimate:renderEstimate,reports:renderReports,audit:renderAudit,taaccess:renderTALogins,chat:renderChat}[state.page]||renderDashboard)();document.querySelectorAll('.nav[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===state.page))}
+function render(){if(state.role==='ta'&&!['dashboard','chat','appupdate'].includes(state.page))state.page='dashboard';({dashboard:renderDashboard,profiles:renderProfiles,tracker:renderTracker,accounts:renderAccounts,estimate:renderEstimate,reports:renderReports,audit:renderAudit,taaccess:renderTALogins,chat:renderChat,appupdate:renderAppUpdate}[state.page]||renderDashboard)();document.querySelectorAll('.nav[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===state.page))}
 function stat(label,value,note){return `<div class="stat"><small>${label}</small><strong>${value}</strong><span>${note}</span></div>`}
+const SECURE_V3_WEB_VERSION='1.2.0';
+function getInstalledAppVersion(){
+ try{return window.SecureV3Native?.getAppVersion?.()||SECURE_V3_WEB_VERSION}catch(e){return SECURE_V3_WEB_VERSION}
+}
+function compareAppVersions(a,b){
+ const x=String(a||'0').replace(/^v/i,'').split('.').map(Number),y=String(b||'0').replace(/^v/i,'').split('.').map(Number);
+ for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d>0?1:-1}return 0;
+}
+async function renderAppUpdate(){
+ const installed=getInstalledAppVersion();
+ shell('App Update',`<div class="panel app-update-panel"><div class="app-update-heading"><div class="app-update-icon">↓</div><div><h3>Secure V3 Android App</h3><p class="hint">Check and install the latest official app version.</p></div></div><div class="app-version-grid"><div><small>Installed version</small><b>${esc(installed)}</b></div><div><small>Latest version</small><b id="latestAppVersion">Checking…</b></div></div><div id="appUpdateStatus" class="app-update-status">Checking for updates…</div><div id="appUpdateNotes" class="app-update-notes"></div><div id="appUpdateAction"></div><p class="hint app-update-help">After downloading, open the APK and follow Android's installation prompt. Your portal records are stored online and are not removed by an app update.</p></div>`);
+ const status=$('#appUpdateStatus'),latest=$('#latestAppVersion'),action=$('#appUpdateAction'),notes=$('#appUpdateNotes');
+ try{
+  const response=await fetch('https://api.github.com/repos/digitalfoxcreations/secure-suite-web/releases/latest',{headers:{Accept:'application/vnd.github+json'}});
+  if(!response.ok)throw new Error(response.status===404?'No public app release has been published yet.':'Could not check for updates. Please try again later.');
+  const release=await response.json(),version=String(release.tag_name||'').replace(/^v/i,''),apk=(release.assets||[]).find(x=>/\.apk$/i.test(x.name));
+  latest.textContent=version||'—';
+  if(!version)throw new Error('The latest release does not have a version tag.');
+  if(compareAppVersions(version,installed)<=0){
+   status.innerHTML='<span class="update-current">✓ You are using the latest version.</span>';
+   action.innerHTML='<button type="button" class="secondary" id="checkAgainBtn">Check again</button>';
+  }else{
+   status.innerHTML='<span class="update-available">A newer version is available.</span>';
+   action.innerHTML=apk?`<a class="primary app-update-download" href="${esc(apk.browser_download_url)}" target="_blank" rel="noopener">↓ Download Secure V3 ${esc(version)}</a>`:`<a class="primary app-update-download" href="${esc(release.html_url)}" target="_blank" rel="noopener">View release and download</a>`;
+  }
+  notes.innerHTML=release.body?`<h4>What's new</h4><div>${esc(release.body).replace(/\r?\n/g,'<br>')}</div>`:'';
+  $('#checkAgainBtn')?.addEventListener('click',renderAppUpdate);
+ }catch(error){
+  latest.textContent='Unavailable';status.textContent=error.message;
+  action.innerHTML='<button type="button" class="secondary" id="retryAppUpdate">Try again</button>';
+  $('#retryAppUpdate').onclick=renderAppUpdate;
+ }
+}
 function renderDashboard(){
  if(state.role==='ta'){const ta=state.profiles[0],billed=state.jobs.reduce((s,x)=>s+Number(x.bill_amount||0),0),allocated=state.jobs.reduce((s,x)=>s+Number(x.paid_amount||0),0),due=state.jobs.reduce((s,x)=>s+Math.max(0,Number(x.bill_amount||0)-Number(x.paid_amount||0)),0),received=state.payments.reduce((s,p)=>s+Number(p.amount||0),0);shell('My Dashboard',`<div class="panel"><h3>Welcome, ${esc(ta?.name||'Technical Assistant')}</h3><p class="hint">Read-only account · Only your assigned work and payment information is shown.</p></div><div class="stats">${stat('MY WORKS',state.jobs.length,'Assigned to your profile')}${stat('COMPLETED',state.jobs.filter(x=>x.status==='Completed').length,'All registered works')}${stat('TOTAL WORK BILL',money(billed),'Your work register')}${stat('AMOUNT ALLOCATED',money(allocated),'Payments applied to your works')}${stat('PAYMENTS RECEIVED',money(received),'Your payment ledger')}${stat('OUTSTANDING',money(due),'Remaining work bill balance')}</div><div class="panel"><div class="panel-head"><h3>My work status</h3><span class="pill done">Read only</span></div>${taJobsTable(state.jobs)}</div><div class="panel"><div class="panel-head"><h3>Payment summary</h3><span class="pill neutral">${state.payments.length} entries</span></div><p class="hint">Payments received: <b>${money(received)}</b> · Allocated to works: <b>${money(allocated)}</b> · Outstanding: <b>${money(due)}</b></p></div>`);return}
  const completed=state.jobs.filter(x=>x.status==='Completed').length,billed=state.jobs.reduce((s,x)=>s+Number(x.bill_amount||0),0),paid=state.jobs.reduce((s,x)=>s+Number(x.paid_amount||0),0);
