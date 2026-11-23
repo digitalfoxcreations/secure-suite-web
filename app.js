@@ -41,7 +41,7 @@ async function loadAll(){
 function shell(title,html){$('#pageTitle').textContent=title;$('#pageContent').innerHTML=html}
 function render(){if(state.role==='ta'&&!['dashboard','chat','appupdate'].includes(state.page))state.page='dashboard';({dashboard:renderDashboard,profiles:renderProfiles,tracker:renderTracker,accounts:renderAccounts,estimate:renderEstimate,reports:renderReports,audit:renderAudit,taaccess:renderTALogins,chat:renderChat,appupdate:renderAppUpdate}[state.page]||renderDashboard)();document.querySelectorAll('.nav[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===state.page))}
 function stat(label,value,note){return `<div class="stat"><small>${label}</small><strong>${value}</strong><span>${note}</span></div>`}
-const SECURE_V3_WEB_VERSION='1.2.0';
+const SECURE_V3_WEB_VERSION='1.3.0';
 function getInstalledAppVersion(){
  try{return window.SecureV3Native?.getAppVersion?.()||SECURE_V3_WEB_VERSION}catch(e){return SECURE_V3_WEB_VERSION}
 }
