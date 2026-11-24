@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.content.Intent;
 import android.net.Uri;
 import android.net.ConnectivityManager;
@@ -34,6 +35,8 @@ public class MainActivity extends Activity {
     private View offlineOverlay;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean pageLoaded = false;
+    private long splashShownAt = 0;
+    private static final long MIN_SPLASH_MS = 3000;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -89,7 +92,10 @@ public class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 pageLoaded = true;
                 handler.removeCallbacks(loadTimeout);
-                hideOverlay(splashOverlay);
+                long remaining = Math.max(0, MIN_SPLASH_MS - (SystemClock.elapsedRealtime() - splashShownAt));
+                handler.postDelayed(() -> {
+                    if (pageLoaded) hideOverlay(splashOverlay);
+                }, remaining);
                 hideOverlay(offlineOverlay);
                 injectBlobDownloadSupport();
             }
@@ -137,6 +143,7 @@ public class MainActivity extends Activity {
     private void loadHome() {
         hideOverlay(offlineOverlay);
         showOverlay(splashOverlay);
+        splashShownAt = SystemClock.elapsedRealtime();
         pageLoaded = false;
         handler.removeCallbacks(loadTimeout);
         handler.postDelayed(loadTimeout, 20000);
